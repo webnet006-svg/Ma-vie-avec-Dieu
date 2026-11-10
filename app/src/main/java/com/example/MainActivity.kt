@@ -39,6 +39,10 @@ class MainActivity : ComponentActivity() {
         ThemeMode.SYSTEM -> systemInDark
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
+        ThemeMode.BLEU -> false
+        ThemeMode.VERT -> false
+        ThemeMode.ROUGE -> false
+        ThemeMode.VIOLET -> false
       }
 
       var currentRootScreen by rememberSaveable { mutableStateOf<String>(Screen.Splash.route) }

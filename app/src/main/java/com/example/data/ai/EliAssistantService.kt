@@ -26,7 +26,8 @@ class EliAssistantService(
   suspend fun askEli(
     userQuestion: String,
     history: List<Pair<String, Boolean>>,
-    configuredModel: String = "gemini-2.5-flash"
+    configuredModel: String = "gemini-2.5-flash",
+    apiKeyOverride: String? = null
   ): EliMessage {
     val timestamp = timeFormat.format(Date())
 
@@ -47,7 +48,8 @@ class EliAssistantService(
     val geminiResult = geminiClient.askGemini(
       userPrompt = userQuestion,
       conversationHistory = history,
-      configuredModel = configuredModel
+      configuredModel = configuredModel,
+      apiKeyOverride = apiKeyOverride
     )
 
     return when (geminiResult) {

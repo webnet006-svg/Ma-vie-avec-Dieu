@@ -27,6 +27,8 @@ class UserPreferencesRepository(private val context: Context) {
     val TOTAL_PRAYERS_ANSWERED = intPreferencesKey("total_prayers_answered")
     val TOTAL_CHAPTERS_READ = intPreferencesKey("total_chapters_read")
     val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+    val GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+    val FAVORITE_VERSES = stringSetPreferencesKey("favorite_verses")
   }
 
   val onboardingCompleted: Flow<Boolean> = context.dataStore.data
@@ -56,6 +58,7 @@ class UserPreferencesRepository(private val context: Context) {
       val notifications = preferences[PreferencesKeys.NOTIFICATIONS_ENABLED] ?: true
       val themeString = preferences[PreferencesKeys.THEME_MODE] ?: ThemeMode.SYSTEM.name
       val themeMode = runCatching { ThemeMode.valueOf(themeString) }.getOrDefault(ThemeMode.SYSTEM)
+      val geminiApiKey = preferences[PreferencesKeys.GEMINI_API_KEY] ?: ""
       val streak = preferences[PreferencesKeys.CURRENT_STREAK] ?: 0
       val prayersAnswered = preferences[PreferencesKeys.TOTAL_PRAYERS_ANSWERED] ?: 0
       val chaptersRead = preferences[PreferencesKeys.TOTAL_CHAPTERS_READ] ?: 0
@@ -68,23 +71,38 @@ class UserPreferencesRepository(private val context: Context) {
         eveningReflectionTime = eveningTime,
         notificationsEnabled = notifications,
         themeMode = themeMode,
+        geminiApiKey = geminiApiKey,
         currentStreak = streak,
         totalPrayersAnswered = prayersAnswered,
         totalChaptersRead = chaptersRead
       )
     }
 
+  val favoritedVerses: Flow<Set<String>> = context.dataStore.data
+    .catch { exception ->
+      if (exception is IOException) {
+        emit(emptyPreferences())
+      } else {
+        throw exception
+      }
+    }
+    .map { preferences ->
+      preferences[PreferencesKeys.FAVORITE_VERSES] ?: emptySet()
+    }
+
   suspend fun updateProfile(
     name: String,
     preferredVersion: String,
     reminderTime: String,
-    themeMode: ThemeMode
+    themeMode: ThemeMode,
+    geminiApiKey: String = ""
   ) {
     context.dataStore.edit { preferences ->
       preferences[PreferencesKeys.USER_NAME] = name
       preferences[PreferencesKeys.PREFERRED_VERSION] = preferredVersion
       preferences[PreferencesKeys.PRAYER_REMINDER_TIME] = reminderTime
       preferences[PreferencesKeys.THEME_MODE] = themeMode.name
+      preferences[PreferencesKeys.GEMINI_API_KEY] = geminiApiKey
     }
   }
 
@@ -129,6 +147,23 @@ class UserPreferencesRepository(private val context: Context) {
       preferences.remove(PreferencesKeys.CURRENT_STREAK)
       preferences.remove(PreferencesKeys.TOTAL_PRAYERS_ANSWERED)
       preferences.remove(PreferencesKeys.TOTAL_CHAPTERS_READ)
+      preferences.remove(PreferencesKeys.FAVORITE_VERSES)
+    }
+  }
+
+  suspend fun addFavoriteVerse(verseKey: String) {
+    context.dataStore.edit { preferences ->
+      val current = preferences[PreferencesKeys.FAVORITE_VERSES] ?: emptySet<String>()
+      val updated = current.toMutableSet().apply { add(verseKey) }
+      preferences[PreferencesKeys.FAVORITE_VERSES] = updated
+    }
+  }
+
+  suspend fun removeFavoriteVerse(verseKey: String) {
+    context.dataStore.edit { preferences ->
+      val current = preferences[PreferencesKeys.FAVORITE_VERSES] ?: emptySet<String>()
+      val updated = current.toMutableSet().apply { remove(verseKey) }
+      preferences[PreferencesKeys.FAVORITE_VERSES] = updated
     }
   }
 }

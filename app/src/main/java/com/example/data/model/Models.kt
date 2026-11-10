@@ -45,7 +45,11 @@ enum class GoalFrequency(val code: String, val label: String) {
 enum class ThemeMode(val label: String) {
   SYSTEM("Selon le système"),
   LIGHT("Mode clair"),
-  DARK("Mode sombre")
+  DARK("Mode sombre"),
+  BLEU("Thème Bleu"),
+  VERT("Thème Vert"),
+  ROUGE("Thème Rouge"),
+  VIOLET("Thème Violet")
 }
 
 data class Verse(
@@ -185,6 +189,7 @@ data class UserProfile(
   val eveningReflectionTime: String = "21:30",
   val notificationsEnabled: Boolean = true,
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
+  val geminiApiKey: String = "",
   val currentStreak: Int = 0,
   val totalPrayersAnswered: Int = 0,
   val totalChaptersRead: Int = 0

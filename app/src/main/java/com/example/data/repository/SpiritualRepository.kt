@@ -132,6 +132,7 @@ class SpiritualRepository(
 
   // Profile preferences
   val profile: Flow<UserProfile> = preferences.userProfileFlow
+  val favoritedVerses: Flow<Set<String>> = preferences.favoritedVerses
   val onboardingCompleted: Flow<Boolean> = preferences.onboardingCompleted
 
   // Weekly Review calculation
@@ -326,8 +327,16 @@ class SpiritualRepository(
 
   // --- USER PROFILE & PREFERENCES ---
 
-  suspend fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode) {
-    preferences.updateProfile(name, version, reminderTime, themeMode)
+  suspend fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode, geminiApiKey: String = "") {
+    preferences.updateProfile(name, version, reminderTime, themeMode, geminiApiKey)
+  }
+
+  suspend fun toggleFavoriteVerse(verseKey: String, isFavorite: Boolean) {
+    if (isFavorite) {
+      preferences.addFavoriteVerse(verseKey)
+    } else {
+      preferences.removeFavoriteVerse(verseKey)
+    }
   }
 
   suspend fun markOnboardingCompleted() {

@@ -73,6 +73,9 @@ class MainViewModel @JvmOverloads constructor(
   val favoriteDailyVerses: StateFlow<List<DailyVerseEntity>> = dailyVerseRepository.favoriteVerses
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  val favoritedBibleVerses: StateFlow<Set<String>> = repository.favoritedVerses
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
   val todayVerseOfTheDay: StateFlow<DailyVerseEntity?> = dailyVerseRepository.allDailyVerses.map { list ->
     val today = DailyVerseRepository.getTodayDate()
     list.firstOrNull { it.date == today } ?: list.firstOrNull()
@@ -318,9 +321,9 @@ class MainViewModel @JvmOverloads constructor(
     }
   }
 
-  fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode) {
+  fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode, geminiApiKey: String = "") {
     viewModelScope.launch {
-      repository.updateProfile(name, version, reminderTime, themeMode)
+      repository.updateProfile(name, version, reminderTime, themeMode, geminiApiKey)
     }
   }
 
@@ -358,10 +361,12 @@ class MainViewModel @JvmOverloads constructor(
       // History pairs of (text, isUser)
       val history = _eliMessages.value.map { Pair(it.content, it.isUser) }
 
+      val apiKey = profile.value?.geminiApiKey ?: ""
       val response = eliService.askEli(
         userQuestion = textToSend,
         history = history,
-        configuredModel = _selectedAiModel.value
+        configuredModel = _selectedAiModel.value,
+        apiKeyOverride = apiKey
       )
 
       _eliMessages.update { it + response }
@@ -501,7 +506,13 @@ class MainViewModel @JvmOverloads constructor(
     }, onError = onError)
   }
 
-  // --- DAILY VERSE (ROOM) ACTIONS ---
+  fun toggleBibleVerseFavorite(bookId: String, chapterNumber: Int, verseNumber: Int) {
+    viewModelScope.launch {
+      val key = "$bookId:$chapterNumber:$verseNumber"
+      val isFav = repository.favoritedVerses.first().contains(key)
+      repository.toggleFavoriteVerse(key, !isFav)
+    }
+  }
 
   fun toggleDailyVerseFavorite(verseId: String, isFavorite: Boolean) {
     viewModelScope.launch {
