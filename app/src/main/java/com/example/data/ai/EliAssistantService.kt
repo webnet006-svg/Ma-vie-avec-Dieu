@@ -8,6 +8,7 @@ import com.example.data.ai.model.EliQuotaState
 import com.example.data.ai.verifier.BibleReferenceVerifier
 import com.example.data.ai.verifier.VerifiedCitationResult
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,17 +26,19 @@ class EliAssistantService(
   suspend fun askEli(
     userQuestion: String,
     history: List<Pair<String, Boolean>>,
-    configuredModel: String = "gemini-2.5-flash"
+    configuredModel: String = "gemini-2.5-flash",
+    apiKeyOverride: String? = null
   ): EliMessage {
     val timestamp = timeFormat.format(Date())
 
-    // 1. Check daily quota
-    val quotaAllowed = quotaTracker.recordRequest()
-    if (!quotaAllowed) {
+    // 1. Check daily quota. A request is only counted once Gemini answers,
+    // so offline fallbacks and failed network calls do not consume the quota.
+    val quota = quotaTracker.quotaState.first()
+    if (quota.isExceeded) {
       return EliMessage(
         id = "msg_${System.currentTimeMillis()}",
         isUser = false,
-        content = "Vous avez atteint votre limite quotidienne de 20 questions avec Eli. Cette mesure permet d'assurer un accès équitable et mesuré. Votre quota sera réinitialisé à minuit. En attendant, vous pouvez continuer à méditer les plans de lecture et les passages bibliques hors-ligne !",
+        content = "Vous avez atteint votre limite quotidienne de ${quota.dailyLimit} questions avec Eli. Cette mesure permet d'assurer un accès équitable et mesuré. Votre quota sera réinitialisé à minuit. En attendant, vous pouvez continuer à méditer les plans de lecture et les passages bibliques hors-ligne !",
         timestamp = timestamp,
         isError = true
       )
@@ -45,11 +48,13 @@ class EliAssistantService(
     val geminiResult = geminiClient.askGemini(
       userPrompt = userQuestion,
       conversationHistory = history,
-      configuredModel = configuredModel
+      configuredModel = configuredModel,
+      apiKeyOverride = apiKeyOverride
     )
 
     return when (geminiResult) {
       is GeminiResult.Success -> {
+        quotaTracker.recordRequest()
         parseAndEnrichResponse(
           rawContent = geminiResult.rawText,
           timestamp = timestamp,

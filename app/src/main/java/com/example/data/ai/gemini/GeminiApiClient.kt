@@ -32,7 +32,8 @@ sealed class GeminiResult {
 
 class GeminiApiClient(
   private val context: Context,
-  private val defaultModel: String = "gemini-2.5-flash"
+  private val defaultModel: String = "gemini-2.5-flash",
+  private val apiKeyOverride: String? = null
 ) {
 
   private val client: OkHttpClient = OkHttpClient.Builder()
@@ -77,7 +78,8 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
   suspend fun askGemini(
     userPrompt: String,
     conversationHistory: List<Pair<String, Boolean>> = emptyList(),
-    configuredModel: String = defaultModel
+    configuredModel: String = defaultModel,
+    apiKeyOverride: String? = null
   ): GeminiResult = withContext(Dispatchers.IO) {
     // 1. Check network connectivity
     if (!isNetworkAvailable()) {
@@ -88,7 +90,7 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
     }
 
     // 2. Check API key presence
-    val apiKey = BuildConfig.GEMINI_API_KEY
+    val apiKey = apiKeyOverride ?: this.apiKeyOverride ?: BuildConfig.GEMINI_API_KEY
     if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
       return@withContext GeminiResult.Error(
         errorMessage = "Clé Gemini API non configurée dans le panneau Secrets. Le moteur biblique local prend le relais.",
@@ -97,7 +99,7 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
     }
 
     try {
-      val url = "https://generativelanguage.googleapis.com/v1beta/models/$configuredModel:generateContent?key=$apiKey"
+      val url = "https://generativelanguage.googleapis.com/v1beta/models/$configuredModel:generateContent"
 
       val contentsArray = JSONArray()
 
@@ -135,6 +137,7 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
 
       val request = Request.Builder()
         .url(url)
+        .addHeader("x-goog-api-key", apiKey)
         .post(requestBodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
         .build()
 

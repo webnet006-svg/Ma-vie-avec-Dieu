@@ -18,6 +18,7 @@ import com.example.data.repository.SpiritualRepository
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +73,9 @@ class MainViewModel @JvmOverloads constructor(
   val favoriteDailyVerses: StateFlow<List<DailyVerseEntity>> = dailyVerseRepository.favoriteVerses
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+  val favoritedBibleVerses: StateFlow<Set<String>> = repository.favoritedVerses
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
   val todayVerseOfTheDay: StateFlow<DailyVerseEntity?> = dailyVerseRepository.allDailyVerses.map { list ->
     val today = DailyVerseRepository.getTodayDate()
     list.firstOrNull { it.date == today } ?: list.firstOrNull()
@@ -113,6 +117,9 @@ class MainViewModel @JvmOverloads constructor(
   val profile: StateFlow<UserProfile> = repository.profile
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserProfile())
 
+  val onboardingCompleted: StateFlow<Boolean> = repository.onboardingCompleted
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
   val chatMessages: StateFlow<List<ChatMessage>> = repository.chatMessages
   val bibleBooks: List<BibleBook> = repository.bibleBooks
 
@@ -123,15 +130,17 @@ class MainViewModel @JvmOverloads constructor(
   private val _selectedChapterNumber = MutableStateFlow(23)
   val selectedChapterNumber: StateFlow<Int> = _selectedChapterNumber.asStateFlow()
 
-  val currentBibleChapter: StateFlow<BibleChapter> = combine(
+  val currentBibleChapter: StateFlow<BibleChapter?> = combine(
     _selectedBookId,
     _selectedChapterNumber
   ) { bookId, chapterNum ->
-    repository.getChapterContent(bookId, chapterNum)
+    bookId to chapterNum
+  }.flatMapLatest { (bookId, chapterNum) ->
+    flow { emit(repository.getChapterContent(bookId, chapterNum)) }
   }.stateIn(
     scope = viewModelScope,
     started = SharingStarted.WhileSubscribed(5000),
-    initialValue = repository.getChapterContent("PSA", 23)
+    initialValue = null
   )
 
   // Prayer Filter & Search
@@ -306,9 +315,15 @@ class MainViewModel @JvmOverloads constructor(
     _selectedChapterNumber.value = chapter
   }
 
-  fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode) {
+  fun completeOnboarding() {
     viewModelScope.launch {
-      repository.updateProfile(name, version, reminderTime, themeMode)
+      repository.markOnboardingCompleted()
+    }
+  }
+
+  fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode, geminiApiKey: String = "") {
+    viewModelScope.launch {
+      repository.updateProfile(name, version, reminderTime, themeMode, geminiApiKey)
     }
   }
 
@@ -346,10 +361,12 @@ class MainViewModel @JvmOverloads constructor(
       // History pairs of (text, isUser)
       val history = _eliMessages.value.map { Pair(it.content, it.isUser) }
 
+      val apiKey = profile.value?.geminiApiKey ?: ""
       val response = eliService.askEli(
         userQuestion = textToSend,
         history = history,
-        configuredModel = _selectedAiModel.value
+        configuredModel = _selectedAiModel.value,
+        apiKeyOverride = apiKey
       )
 
       _eliMessages.update { it + response }
@@ -379,20 +396,35 @@ class MainViewModel @JvmOverloads constructor(
     viewModelScope.launch {
       _syncStatus.value = SyncState.SYNCING
       try {
-        // 1. Sync User Profile
+        // 1. Pull cloud data first so a new device restores what was saved.
+        val remotePrayers = runCatching {
+          withTimeoutOrNull(10_000) { firestoreSyncRepo.observePrayers().first() }
+        }.getOrNull() ?: emptyList()
+        if (remotePrayers.isNotEmpty()) {
+          repository.insertRemotePrayers(remotePrayers)
+        }
+
+        val remoteGoals = runCatching {
+          withTimeoutOrNull(10_000) { firestoreSyncRepo.observeGoals().first() }
+        }.getOrNull() ?: emptyList()
+        if (remoteGoals.isNotEmpty()) {
+          repository.insertRemoteGoals(remoteGoals)
+        }
+
+        // 2. Sync User Profile
         val currentProfile = repository.profile.first()
         firestoreSyncRepo.saveUserProfile(
           FirestoreUserProfile(
             userId = user.uid,
             displayName = currentProfile.name,
             email = user.email,
-            denominationalAffiliation = currentProfile.preferredVersion,
+            denominationalAffiliation = null,
             dailyNotificationTime = currentProfile.prayerReminderTime,
             offlineModeEnabled = false
           )
         )
 
-        // 2. Sync Local Prayers to Firestore
+        // 3. Sync Local Prayers to Firestore
         val localPrayers = repository.prayers.first()
         for (p in localPrayers) {
           firestoreSyncRepo.savePrayer(
@@ -411,7 +443,7 @@ class MainViewModel @JvmOverloads constructor(
           )
         }
 
-        // 3. Sync Goals to Firestore
+        // 4. Sync Goals to Firestore
         val localGoals = repository.goals.first()
         for (g in localGoals) {
           firestoreSyncRepo.saveGoal(
@@ -420,7 +452,7 @@ class MainViewModel @JvmOverloads constructor(
               userId = user.uid,
               title = g.title,
               description = g.description,
-              category = g.category.label,
+              category = g.category.name,
               targetDaysPerWeek = g.targetCount,
               completedDaysThisWeek = g.currentCount,
               streakWeeks = g.streakDays
@@ -428,7 +460,7 @@ class MainViewModel @JvmOverloads constructor(
           )
         }
 
-        // 4. Sync Preferences to Firestore
+        // 5. Sync Preferences to Firestore
         firestoreSyncRepo.savePreferences(
           FirestorePreferences(
             userId = user.uid,
@@ -456,7 +488,11 @@ class MainViewModel @JvmOverloads constructor(
 
   fun signOut() {
     authManager.signOut(viewModelScope) {
-      _syncStatus.value = SyncState.IDLE
+      viewModelScope.launch {
+        repository.clearLocalUserData()
+        _eliMessages.value = listOf(initialEliGreeting)
+        _syncStatus.value = SyncState.IDLE
+      }
     }
   }
 
@@ -470,7 +506,13 @@ class MainViewModel @JvmOverloads constructor(
     }, onError = onError)
   }
 
-  // --- DAILY VERSE (ROOM) ACTIONS ---
+  fun toggleBibleVerseFavorite(bookId: String, chapterNumber: Int, verseNumber: Int) {
+    viewModelScope.launch {
+      val key = "$bookId:$chapterNumber:$verseNumber"
+      val isFav = repository.favoritedVerses.first().contains(key)
+      repository.toggleFavoriteVerse(key, !isFav)
+    }
+  }
 
   fun toggleDailyVerseFavorite(verseId: String, isFavorite: Boolean) {
     viewModelScope.launch {

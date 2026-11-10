@@ -49,9 +49,11 @@ fun ProfileScreen(
   var nameInput by remember { mutableStateOf(profile.name) }
   var reminderInput by remember { mutableStateOf(profile.prayerReminderTime) }
   var selectedVersion by remember { mutableStateOf(profile.preferredVersion) }
-  var selectedTheme by remember { mutableStateOf(profile.themeMode) }
+var selectedTheme by remember { mutableStateOf(profile.themeMode) }
+    var geminiApiKeyInput by remember { mutableStateOf(profile.geminiApiKey) }
 
-  val bibleVersions = listOf("Segond 21", "Louis Segond 1910", "Bible du Semeur", "Darby")
+    val bibleVersions = listOf("Louis Segond 1910")
+    val themeOptions = ThemeMode.entries.toList()
 
   Scaffold(
     topBar = {
@@ -397,6 +399,66 @@ fun ProfileScreen(
               }
             }
           }
+
+            Text("Version de la Bible préférée :", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+
+          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            bibleVersions.forEach { ver ->
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .clickable { selectedVersion = ver }
+              ) {
+                RadioButton(
+                  selected = selectedVersion == ver,
+                  onClick = { selectedVersion = ver }
+                )
+                Text(ver, style = MaterialTheme.typography.bodyMedium)
+              }
+            }
+          }
+
+          HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+          Text("Apparence & Thème :", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+
+          Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            themeOptions.forEach { theme ->
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .clickable { selectedTheme = theme }
+              ) {
+                RadioButton(
+                  selected = selectedTheme == theme,
+                  onClick = { selectedTheme = theme }
+                )
+                Text(theme.label, style = MaterialTheme.typography.bodyMedium)
+              }
+            }
+          }
+
+          HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+          Text("Clé API Gemini (optionnelle) :", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+
+          OutlinedTextField(
+            value = geminiApiKeyInput,
+            onValueChange = { geminiApiKeyInput = it },
+            label = { Text("Votre clé API Gemini (pour l'assistant IA)") },
+            singleLine = true,
+            placeholder = { Text("Clé par défaut si vide") },
+            modifier = Modifier.fillMaxWidth()
+          )
+
+          Text(
+            text = "Si vide, l'application utilisera la clé par défaut (peut-être intégrée).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+          )
         }
       },
       confirmButton = {
@@ -406,8 +468,10 @@ fun ProfileScreen(
               name = nameInput.trim().ifBlank { "Disciple" },
               version = selectedVersion,
               reminderTime = reminderInput.trim().ifBlank { "07:00" },
-              themeMode = selectedTheme
+              themeMode = selectedTheme,
+              geminiApiKey = geminiApiKeyInput.trim()
             )
+            viewModel.completeOnboarding()
             isEditingProfile = false
           },
           colors = ButtonDefaults.buttonColors(containerColor = VertProfond),

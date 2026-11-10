@@ -35,11 +35,18 @@ fun BibleScreen(
   viewModel: MainViewModel,
   modifier: Modifier = Modifier
 ) {
-  val books = viewModel.bibleBooks
   val selectedBookId by viewModel.selectedBookId.collectAsState()
   val selectedChapterNum by viewModel.selectedChapterNumber.collectAsState()
   val currentChapter by viewModel.currentBibleChapter.collectAsState()
   val context = LocalContext.current
+
+  var selectedTestament by remember { mutableStateOf(Testament.NOUVEAU) }
+  var isBookSelectorOpen by remember { mutableStateOf(false) }
+  var isChapterSelectorOpen by remember { mutableStateOf(false) }
+  var searchQuery by remember { mutableStateOf("") }
+  var fontSizeSp by remember { mutableStateOf(16) }
+  var highlightedVerses by remember { mutableStateOf(setOf<Int>()) }
+  val favoritedVerses by viewModel.favoritedBibleVerses.collectAsState()
 
   var selectedTestament by remember { mutableStateOf(Testament.NOUVEAU) }
   var isBookSelectorOpen by remember { mutableStateOf(false) }
@@ -78,7 +85,7 @@ fun BibleScreen(
                 )
               }
               Text(
-                text = "${currentBook.category} • Version Segond 21",
+                text = "${currentBook.category} • Louis Segond 1910",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
               )
@@ -220,7 +227,18 @@ fun BibleScreen(
           }
         }
 
-        items(currentChapter.verses) { verse ->
+        val chapter = currentChapter
+        if (chapter == null) {
+          item {
+            Box(
+              modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+              contentAlignment = Alignment.Center
+            ) {
+              CircularProgressIndicator(color = OrDoux)
+            }
+          }
+        } else {
+          items(chapter.verses) { verse ->
           val isHighlighted = highlightedVerses.contains(verse.number)
 
           Surface(
@@ -267,7 +285,7 @@ fun BibleScreen(
                     action = Intent.ACTION_SEND
                     putExtra(
                       Intent.EXTRA_TEXT,
-                      "« ${verse.text} » — ${currentBook.name} $selectedChapterNum:${verse.number} (Segond 21)"
+                      "« ${verse.text} » — ${currentBook.name} $selectedChapterNum:${verse.number} (Louis Segond 1910)"
                     )
                     type = "text/plain"
                   }
@@ -282,7 +300,33 @@ fun BibleScreen(
                   modifier = Modifier.size(16.dp)
                 )
               }
+              IconButton(
+                onClick = {
+                  viewModel.toggleBibleVerseFavorite(currentBook.id, selectedChapterNum, verse.number)
+                },
+                modifier = Modifier.size(32.dp)
+              ) {
+                Icon(
+                  imageVector = if (favoritedVerses.contains("$currentBook.id:$selectedChapterNum:${verse.number}")) {
+                    Icons.Filled.Bookmark
+                  } else {
+                    Icons.Outlined.BookmarkBorder
+                  },
+                  contentDescription = if (favoritedVerses.contains("$currentBook.id:$selectedChapterNum:${verse.number}")) {
+                    "Retirer des favoris"
+                  } else {
+                    "Mettre en favoris"
+                  },
+                  tint = if (favoritedVerses.contains("$currentBook.id:$selectedChapterNum:${verse.number}")) {
+                    MaterialTheme.colorScheme.primary
+                  } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                  },
+                  modifier = Modifier.size(16.dp)
+                )
+              }
             }
+          }
           }
         }
 
@@ -320,6 +364,34 @@ fun BibleScreen(
               Text("Chapitre suivant")
               Spacer(modifier = Modifier.width(4.dp))
               Icon(Icons.Default.ChevronRight, contentDescription = null)
+            }
+          }
+        }
+
+        // Favoris pour ce livre/chapitre
+        val chapterFavorites = favoritedVerses.filter { it.startsWith("$currentBook.id:$selectedChapterNum:") }
+        if (chapterFavorites.isNotEmpty()) {
+          item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+              text = "Versets favoris (ce chapitre)",
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.Bold,
+              color = MaterialTheme.colorScheme.onSurface,
+              modifier = Modifier.padding(vertical = 8.dp)
+            )
+          }
+          items(chapterFavorites) { favKey ->
+            val verseNum = favKey.split(":").last().toIntOrNull() ?: 0
+            item {
+              Text(
+                text = "★ $verseNum",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(vertical = 4.dp, horizontal = 16.dp)
+              )
             }
           }
         }

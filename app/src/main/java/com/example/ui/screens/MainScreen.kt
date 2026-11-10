@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -22,7 +23,7 @@ fun MainScreen(
   viewModel: MainViewModel,
   modifier: Modifier = Modifier
 ) {
-  var currentRoute by remember { mutableStateOf(Screen.Home.route) }
+  var currentRoute by rememberSaveable { mutableStateOf(Screen.Home.route) }
 
   // Handle system back button smoothly
   BackHandler(enabled = currentRoute != Screen.Home.route) {

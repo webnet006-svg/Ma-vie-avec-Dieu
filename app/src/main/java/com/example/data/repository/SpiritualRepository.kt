@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.example.data.bible.BibleRepository
 import com.example.data.local.AppDatabase
 import com.example.data.local.UserPreferencesRepository
 import com.example.data.local.entity.DevotionEntity
@@ -22,6 +23,7 @@ class SpiritualRepository(
 ) {
 
   private val prayerDao = database.prayerDao()
+  private val bibleRepository = BibleRepository(context)
   private val devotionDao = database.devotionDao()
   private val readingPlanDao = database.readingPlanDao()
   private val goalDao = database.spiritualGoalDao()
@@ -130,6 +132,8 @@ class SpiritualRepository(
 
   // Profile preferences
   val profile: Flow<UserProfile> = preferences.userProfileFlow
+  val favoritedVerses: Flow<Set<String>> = preferences.favoritedVerses
+  val onboardingCompleted: Flow<Boolean> = preferences.onboardingCompleted
 
   // Weekly Review calculation
   val weeklyReview: Flow<WeeklyReview> = combine(goals, prayers, allDevotions) { gList, pList, dList ->
@@ -323,8 +327,20 @@ class SpiritualRepository(
 
   // --- USER PROFILE & PREFERENCES ---
 
-  suspend fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode) {
-    preferences.updateProfile(name, version, reminderTime, themeMode)
+  suspend fun updateProfile(name: String, version: String, reminderTime: String, themeMode: ThemeMode, geminiApiKey: String = "") {
+    preferences.updateProfile(name, version, reminderTime, themeMode, geminiApiKey)
+  }
+
+  suspend fun toggleFavoriteVerse(verseKey: String, isFavorite: Boolean) {
+    if (isFavorite) {
+      preferences.addFavoriteVerse(verseKey)
+    } else {
+      preferences.removeFavoriteVerse(verseKey)
+    }
+  }
+
+  suspend fun markOnboardingCompleted() {
+    preferences.markOnboardingCompleted()
   }
 
   // --- BIBLE CANON (66 Books) ---
@@ -368,7 +384,7 @@ class SpiritualRepository(
     BibleBook("SOP", "Sophonie", Testament.ANCIEN, 3, "Petits Prophètes"),
     BibleBook("AGG", "Aggée", Testament.ANCIEN, 2, "Petits Prophètes"),
     BibleBook("ZAC", "Zacharie", Testament.ANCIEN, 14, "Petits Prophètes"),
-    BibleBook("MAL", "Malachie", Testament.ANCIEN, 4, "Petits Prophètes"),
+    BibleBook("MAL", "Malachie", Testament.ANCIEN, 3, "Petits Prophètes"),
 
     // Nouveau Testament
     BibleBook("MAT", "Matthieu", Testament.NOUVEAU, 28, "Évangiles"),
@@ -400,58 +416,14 @@ class SpiritualRepository(
     BibleBook("APO", "Apocalypse", Testament.NOUVEAU, 22, "Prophétie")
   )
 
-  fun getChapterContent(bookId: String, chapterNumber: Int): BibleChapter {
-    val book = bibleBooks.firstOrNull { it.id == bookId } ?: bibleBooks.first { it.id == "PSA" }
-    return when {
-      book.id == "PSA" && chapterNumber == 23 -> BibleChapter(
-        bookId = "PSA",
-        bookName = "Psaumes",
-        chapterNumber = 23,
-        verses = listOf(
-          BibleVerseItem(1, "L'Éternel est mon berger: je ne manquerai de rien."),
-          BibleVerseItem(2, "Il me fait reposer dans de verts pâturages, Il me dirige près des eaux paisibles."),
-          BibleVerseItem(3, "Il restaure mon âme, Il me conduit dans les sentiers de la justice, À cause de son nom."),
-          BibleVerseItem(4, "Quand je marche dans la vallée de l'ombre de la mort, Je ne crains aucun mal, car tu es avec moi: Ta houlette et ton bâton me rassurent."),
-          BibleVerseItem(5, "Tu dresses devant moi une table, en face de mes adversaires; Tu oins d'huile ma tête, et ma coupe déborde."),
-          BibleVerseItem(6, "Oui, le bonheur et la grâce m'accompagneront tous les jours de ma vie, et j'habiterai dans la maison de l'Éternel jusqu'à la fin de mes jours.")
-        )
-      )
-      book.id == "JEA" && chapterNumber == 1 -> BibleChapter(
-        bookId = "JEA",
-        bookName = "Jean",
-        chapterNumber = 1,
-        verses = listOf(
-          BibleVerseItem(1, "Au commencement était la Parole, et la Parole était avec Dieu, et la Parole était Dieu."),
-          BibleVerseItem(2, "Elle était au commencement avec Dieu."),
-          BibleVerseItem(3, "Toutes choses ont été faites par elle, et rien de ce qui a été fait n'a été fait sans elle."),
-          BibleVerseItem(4, "En elle était la vie, et la vie était la lumière des hommes."),
-          BibleVerseItem(5, "La lumière luit dans les ténèbres, et les ténèbres ne l'ont point reçue."),
-          BibleVerseItem(12, "Mais à tous ceux qui l'ont reçue, à ceux qui croient en son nom, elle a donné le pouvoir de devenir enfants de Dieu."),
-          BibleVerseItem(14, "Et la parole a été faite chair, et elle a habité parmi nous, pleine de grâce et de vérité; et nous avons contemplé sa gloire.")
-        )
-      )
-      book.id == "ROM" && chapterNumber == 8 -> BibleChapter(
-        bookId = "ROM",
-        bookName = "Romains",
-        chapterNumber = 8,
-        verses = listOf(
-          BibleVerseItem(1, "Il n'y a donc maintenant aucune condamnation pour ceux qui sont en Jésus-Christ."),
-          BibleVerseItem(14, "Car tous ceux qui sont conduits par l'Esprit de Dieu sont fils de Dieu."),
-          BibleVerseItem(28, "Nous savons, du reste, que toutes choses concourent au bien de ceux qui aiment Dieu, de ceux qui sont appelés selon son dessein."),
-          BibleVerseItem(31, "Que dirons-nous donc à l'égard de ces choses? Si Dieu est pour nous, qui sera contre nous?"),
-          BibleVerseItem(39, "Rien ne pourra nous séparer de l'amour de Dieu manifesté en Jésus-Christ notre Seigneur.")
-        )
-      )
-      else -> {
-        val verses = (1..12).map { vNum ->
-          BibleVerseItem(
-            number = vNum,
-            text = "Écoute, Israël! L'Éternel, notre Dieu, est le seul Éternel. Tu aimeras l'Éternel, ton Dieu, de tout ton cœur, de toute ton âme et de toute ta force. Que Sa Parole demeure dans ton esprit (${book.name} $chapterNumber:$vNum)."
-          )
-        }
-        BibleChapter(book.id, book.name, chapterNumber, verses)
-      }
-    }
+  /**
+   * Reads a chapter from the bundled Louis Segond 1910 asset.
+   * Returns null when the book or chapter does not exist.
+   */
+  suspend fun getChapterContent(bookId: String, chapterNumber: Int): BibleChapter? {
+    val book = bibleBooks.firstOrNull { it.id == bookId } ?: return null
+    if (chapterNumber !in 1..book.chaptersCount) return null
+    return bibleRepository.getChapter(book.id, book.name, chapterNumber)
   }
 
   // Pastoral Assistant Logic
@@ -531,7 +503,7 @@ class SpiritualRepository(
   suspend fun clearLocalUserData() {
     prayerDao.deleteAllPrayers()
     goalDao.deleteAllGoals()
-    preferences.resetStreak()
+    preferences.clearUserData()
   }
 
   suspend fun insertRemotePrayers(remotePrayers: List<FirestorePrayer>) {
@@ -559,7 +531,9 @@ class SpiritualRepository(
         id = g.id,
         title = g.title,
         description = g.description ?: "",
-        category = g.category,
+        category = GoalCategory.entries.firstOrNull {
+          it.name == g.category || it.label == g.category
+        }?.name ?: GoalCategory.PRIERE.name,
         targetValue = g.targetDaysPerWeek,
         currentValue = g.completedDaysThisWeek,
         unit = "jours/semaine",

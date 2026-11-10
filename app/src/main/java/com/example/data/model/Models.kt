@@ -45,7 +45,11 @@ enum class GoalFrequency(val code: String, val label: String) {
 enum class ThemeMode(val label: String) {
   SYSTEM("Selon le système"),
   LIGHT("Mode clair"),
-  DARK("Mode sombre")
+  DARK("Mode sombre"),
+  BLEU("Thème Bleu"),
+  VERT("Thème Vert"),
+  ROUGE("Thème Rouge"),
+  VIOLET("Thème Violet")
 }
 
 data class Verse(
@@ -55,7 +59,7 @@ data class Verse(
   val book: String,
   val chapter: Int,
   val verseNumber: String,
-  val version: String = "Segond 21",
+  val version: String = "Louis Segond 1910",
   val theme: String = "Foi & Paix",
   val isBookmarked: Boolean = false
 )
@@ -178,16 +182,17 @@ data class ChatMessage(
 )
 
 data class UserProfile(
-  val name: String = "Alexandre",
+  val name: String = "Disciple",
   val favoriteVerse: String = "Car je connais les projets que j'ai formés sur vous, dit l'Éternel... (Jérémie 29:11)",
-  val preferredVersion: String = "Segond 21",
+  val preferredVersion: String = "Louis Segond 1910",
   val prayerReminderTime: String = "07:00",
   val eveningReflectionTime: String = "21:30",
   val notificationsEnabled: Boolean = true,
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
-  val currentStreak: Int = 7,
-  val totalPrayersAnswered: Int = 12,
-  val totalChaptersRead: Int = 48
+  val geminiApiKey: String = "",
+  val currentStreak: Int = 0,
+  val totalPrayersAnswered: Int = 0,
+  val totalChaptersRead: Int = 0
 )
 
 fun formatTimestamp(timestamp: Long): String {
