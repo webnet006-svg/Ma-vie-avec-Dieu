@@ -97,7 +97,7 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
     }
 
     try {
-      val url = "https://generativelanguage.googleapis.com/v1beta/models/$configuredModel:generateContent?key=$apiKey"
+      val url = "https://generativelanguage.googleapis.com/v1beta/models/$configuredModel:generateContent"
 
       val contentsArray = JSONArray()
 
@@ -135,6 +135,7 @@ SOCLE DOCTRINAL & RÈGLES FORMELLES :
 
       val request = Request.Builder()
         .url(url)
+        .addHeader("x-goog-api-key", apiKey)
         .post(requestBodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
         .build()
 

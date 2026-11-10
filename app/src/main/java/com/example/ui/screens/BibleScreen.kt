@@ -78,7 +78,7 @@ fun BibleScreen(
                 )
               }
               Text(
-                text = "${currentBook.category} • Version Segond 21",
+                text = "${currentBook.category} • Louis Segond 1910",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
               )
@@ -220,7 +220,18 @@ fun BibleScreen(
           }
         }
 
-        items(currentChapter.verses) { verse ->
+        val chapter = currentChapter
+        if (chapter == null) {
+          item {
+            Box(
+              modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+              contentAlignment = Alignment.Center
+            ) {
+              CircularProgressIndicator(color = OrDoux)
+            }
+          }
+        } else {
+          items(chapter.verses) { verse ->
           val isHighlighted = highlightedVerses.contains(verse.number)
 
           Surface(
@@ -267,7 +278,7 @@ fun BibleScreen(
                     action = Intent.ACTION_SEND
                     putExtra(
                       Intent.EXTRA_TEXT,
-                      "« ${verse.text} » — ${currentBook.name} $selectedChapterNum:${verse.number} (Segond 21)"
+                      "« ${verse.text} » — ${currentBook.name} $selectedChapterNum:${verse.number} (Louis Segond 1910)"
                     )
                     type = "text/plain"
                   }
@@ -283,6 +294,7 @@ fun BibleScreen(
                 )
               }
             }
+          }
           }
         }
 

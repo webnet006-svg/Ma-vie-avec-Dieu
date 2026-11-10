@@ -13,7 +13,7 @@ data class DailyVerseEntity(
   val chapter: Int,
   val verseNumber: String,
   val theme: String = "Grâce",
-  val translation: String = "Segond 21",
+  val translation: String = "Louis Segond 1910",
   val reflectionPrompt: String = "",
   val prayerPrompt: String = "",
   val date: String, // Format YYYY-MM-DD

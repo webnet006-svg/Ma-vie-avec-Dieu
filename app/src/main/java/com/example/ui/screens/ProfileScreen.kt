@@ -51,7 +51,7 @@ fun ProfileScreen(
   var selectedVersion by remember { mutableStateOf(profile.preferredVersion) }
   var selectedTheme by remember { mutableStateOf(profile.themeMode) }
 
-  val bibleVersions = listOf("Segond 21", "Louis Segond 1910", "Bible du Semeur", "Darby")
+  val bibleVersions = listOf("Louis Segond 1910")
 
   Scaffold(
     topBar = {

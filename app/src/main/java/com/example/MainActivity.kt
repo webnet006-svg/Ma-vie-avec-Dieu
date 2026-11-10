@@ -10,6 +10,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import com.example.data.model.ThemeMode
 import com.example.ui.navigation.Screen
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
 
     setContent {
       val profile by viewModel.profile.collectAsState()
+      val onboardingCompleted by viewModel.onboardingCompleted.collectAsState()
       val systemInDark = isSystemInDarkTheme()
       val isDarkTheme = when (profile.themeMode) {
         ThemeMode.SYSTEM -> systemInDark
@@ -39,7 +41,7 @@ class MainActivity : ComponentActivity() {
         ThemeMode.DARK -> true
       }
 
-      var currentRootScreen by remember { mutableStateOf<String>(Screen.Splash.route) }
+      var currentRootScreen by rememberSaveable { mutableStateOf<String>(Screen.Splash.route) }
 
       MaVieAvecDieuTheme(darkTheme = isDarkTheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -47,13 +49,18 @@ class MainActivity : ComponentActivity() {
             Screen.Splash.route -> {
               SplashScreen(
                 onSplashFinished = {
-                  currentRootScreen = Screen.Onboarding.route
+                  currentRootScreen = if (onboardingCompleted) {
+                    Screen.Home.route
+                  } else {
+                    Screen.Onboarding.route
+                  }
                 }
               )
             }
             Screen.Onboarding.route -> {
               OnboardingScreen(
                 onStartClicked = {
+                  viewModel.completeOnboarding()
                   currentRootScreen = Screen.Home.route
                 }
               )
