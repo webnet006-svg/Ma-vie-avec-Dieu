@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny catch-all rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 200)) &&
+             (!('denominationalAffiliation' in data) || data.denominationalAffiliation == null || (data.denominationalAffiliation is string && data.denominationalAffiliation.size() <= 100)) &&
+             (!('dailyNotificationTime' in data) || data.dailyNotificationTime == null || (data.dailyNotificationTime is string && data.dailyNotificationTime.size() <= 20)) &&
+             (!('offlineModeEnabled' in data) || data.offlineModeEnabled is bool) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidUserPrayer(data, userId, prayerId) {
+      return data.id == prayerId &&
+             data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+             data.category is string && data.category.size() <= 50 &&
+             data.isAnswered is bool &&
+             (!('answeredDate' in data) || data.answeredDate == null || (data.answeredDate is string && data.answeredDate.size() <= 50)) &&
+             (!('answeredNote' in data) || data.answeredNote == null || (data.answeredNote is string && data.answeredNote.size() <= 2000)) &&
+             data.isPrivate is bool &&
+             data.prayCount is int && data.prayCount >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidUserGoal(data, userId, goalId) {
+      return data.id == goalId &&
+             data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 150 &&
+             (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 1000)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 50)) &&
+             data.targetDaysPerWeek is int && data.targetDaysPerWeek >= 1 && data.targetDaysPerWeek <= 7 &&
+             data.completedDaysThisWeek is int && data.completedDaysThisWeek >= 0 && data.completedDaysThisWeek <= 7 &&
+             data.streakWeeks is int && data.streakWeeks >= 0 &&
+             (!('lastProgressDate' in data) || data.lastProgressDate == null || (data.lastProgressDate is string && data.lastProgressDate.size() <= 30)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidReadingProgress(data, userId, progressId) {
+      return data.id == progressId &&
+             data.userId == userId &&
+             data.planId is string && data.planId.size() <= 100 &&
+             data.completedDays is int && data.completedDays >= 0 &&
+             data.totalDays is int && data.totalDays >= 1 &&
+             data.isCompleted is bool &&
+             (!('startedAt' in data) || data.startedAt == null || (data.startedAt is string && data.startedAt.size() <= 50)) &&
+             (!('lastReadAt' in data) || data.lastReadAt == null || (data.lastReadAt is string && data.lastReadAt.size() <= 50)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidUserPreferences(data, userId, prefId) {
+      return data.id == prefId &&
+             data.userId == userId &&
+             data.darkMode is bool &&
+             data.biblicalVersion is string && data.biblicalVersion.size() <= 50 &&
+             (!('selectedAiModel' in data) || data.selectedAiModel == null || (data.selectedAiModel is string && data.selectedAiModel.size() <= 50)) &&
+             (!('fontSizeScale' in data) || data.fontSizeScale is number) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    // Match /users/{userId}
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Users cannot list other users
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'createdAt']);
+
+      allow update: if isOwner(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow delete: if isOwner(userId);
+
+      // Subcollection: Prayers
+      match /prayers/{prayerId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(prayerId) &&
+                         isValidUserPrayer(incoming(), userId, prayerId) &&
+                         incoming().keys().hasAll(['id', 'userId', 'title', 'category', 'isAnswered', 'isPrivate', 'prayCount', 'createdAt']);
+
+        allow update: if isOwner(userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidUserPrayer(incoming(), userId, prayerId);
+
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Goals
+      match /goals/{goalId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(goalId) &&
+                         isValidUserGoal(incoming(), userId, goalId) &&
+                         incoming().keys().hasAll(['id', 'userId', 'title', 'targetDaysPerWeek', 'completedDaysThisWeek', 'streakWeeks', 'createdAt']);
+
+        allow update: if isOwner(userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidUserGoal(incoming(), userId, goalId);
+
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Reading Progress
+      match /reading_progress/{progressId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(progressId) &&
+                         isValidReadingProgress(incoming(), userId, progressId) &&
+                         incoming().keys().hasAll(['id', 'userId', 'planId', 'completedDays', 'totalDays', 'isCompleted']);
+
+        allow update: if isOwner(userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         isValidReadingProgress(incoming(), userId, progressId);
+
+        allow delete: if isOwner(userId);
+      }
+
+      // Subcollection: Preferences
+      match /preferences/{prefId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(prefId) &&
+                         isValidUserPreferences(incoming(), userId, prefId) &&
+                         incoming().keys().hasAll(['id', 'userId', 'darkMode', 'biblicalVersion']);
+
+        allow update: if isOwner(userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         isValidUserPreferences(incoming(), userId, prefId);
+
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

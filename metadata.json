@@ -1,0 +1,6 @@
+{
+  "name": "Ma Vie avec Dieu",
+  "description": "Application chrétienne évangélique et protestante pour la méditation biblique quotidienne, le journal de prière, les objectifs spirituels et l'édification dans la foi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

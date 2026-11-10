@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile and spiritual configuration",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "denominationalAffiliation": { "type": "string", "description": "Church or denomination" },
+        "dailyNotificationTime": { "type": "string", "description": "Daily devotional alert time" },
+        "offlineModeEnabled": { "type": "boolean", "description": "Guest or local cache toggle" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["userId", "displayName", "createdAt"]
+    },
+    "UserPrayer": {
+      "title": "UserPrayer",
+      "description": "Personal prayer request and answered prayer journal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique prayer UUID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "title": { "type": "string", "description": "Prayer request title" },
+        "description": { "type": "string", "description": "Detailed prayer text" },
+        "category": { "type": "string", "description": "Category (FAMILLE, SANTE, TRAVAIL, ETUDES, EGLISE, VIE_PERSONNELLE, AUTRE, etc.)" },
+        "isAnswered": { "type": "boolean", "description": "Whether prayer was answered" },
+        "answeredDate": { "type": "string", "description": "Date answered if applicable" },
+        "answeredNote": { "type": "string", "description": "Gratitude testimony" },
+        "isPrivate": { "type": "boolean", "description": "Whether prayer is private" },
+        "prayCount": { "type": "integer", "description": "Number of times prayed" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["id", "userId", "title", "category", "isAnswered", "isPrivate", "prayCount", "createdAt"]
+    },
+    "UserSpiritualGoal": {
+      "title": "UserSpiritualGoal",
+      "description": "Spiritual discipline goal and weekly progress",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Goal UUID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "title": { "type": "string", "description": "Goal title" },
+        "description": { "type": "string", "description": "Goal description" },
+        "category": { "type": "string", "description": "Goal category" },
+        "targetDaysPerWeek": { "type": "integer", "description": "Target frequency" },
+        "completedDaysThisWeek": { "type": "integer", "description": "Days completed this week" },
+        "streakWeeks": { "type": "integer", "description": "Consecutive weeks streak" },
+        "lastProgressDate": { "type": "string", "description": "Last day progress logged" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["id", "userId", "title", "targetDaysPerWeek", "completedDaysThisWeek", "streakWeeks", "createdAt"]
+    },
+    "UserReadingProgress": {
+      "title": "UserReadingProgress",
+      "description": "Reading plan progress synchronization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Plan progress record ID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "planId": { "type": "string", "description": "Unique identifier of reading plan" },
+        "completedDays": { "type": "integer", "description": "Count of completed plan days" },
+        "totalDays": { "type": "integer", "description": "Total duration in days" },
+        "isCompleted": { "type": "boolean", "description": "Whether plan is fully completed" },
+        "startedAt": { "type": "string", "description": "Date started" },
+        "lastReadAt": { "type": "string", "description": "Date of last reading" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["id", "userId", "planId", "completedDays", "totalDays", "isCompleted"]
+    },
+    "UserPreferencesSync": {
+      "title": "UserPreferencesSync",
+      "description": "Synced preferences for theme, bible version, and AI model",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Preferences document ID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "darkMode": { "type": "boolean", "description": "Dark theme preference" },
+        "biblicalVersion": { "type": "string", "description": "Preferred translation (LSG, etc.)" },
+        "selectedAiModel": { "type": "string", "description": "Configured Gemini model" },
+        "fontSizeScale": { "type": "number", "description": "Font scaling" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["id", "userId", "darkMode", "biblicalVersion"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Personal profile for each user, isolated by userId"
+    },
+    "/users/{userId}/prayers/{prayerId}": {
+      "schema": "UserPrayer",
+      "description": "Private personal prayer requests and testimonies for user"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": "UserSpiritualGoal",
+      "description": "Spiritual goals and weekly discipline progress for user"
+    },
+    "/users/{userId}/reading_progress/{progressId}": {
+      "schema": "UserReadingProgress",
+      "description": "Bible reading plan progress tracking for user"
+    },
+    "/users/{userId}/preferences/{prefId}": {
+      "schema": "UserPreferencesSync",
+      "description": "Device and display preferences for user"
+    }
+  }
+}
